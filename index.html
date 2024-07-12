@@ -15,9 +15,9 @@ function shuffleArray(array) {
 
 fetch("image_widths_heights.json").then(f => {
     if (f.status == 404) {
-        alert("unable to find image_widths_heights.json -- you should run lister.py to create it.")
+        alert("unable to find image_widths_heights.json -- you should run lister.py to create it.");
     }
-    f.json()
+    return f.json()
 }).then(data => {
     let key_values = shuffleArray(data);
 
