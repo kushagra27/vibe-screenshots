@@ -9,13 +9,17 @@ Deploy your screenshot gallery to a custom domain without managing servers!
 ### Steps:
 1. **Connect GitHub:** [railway.app](https://railway.app) → "Deploy from GitHub"
 2. **Select repo:** `your-username/vibe-screenshots`
-3. **Wait for first deploy** (will use demo token initially)
-4. **Set environment variable:**
+3. **Add persistent storage** (CRITICAL for keeping uploads):
+   - Go to Variables tab → Add Volume
+   - Mount Path: `/app/source`
+   - Size: 1GB+ (adjust based on needs)
+4. **Wait for first deploy** (will use demo token initially)
+5. **Set environment variable:**
    - Go to Variables tab in Railway dashboard
    - Add `UPLOAD_TOKEN` = `your-secret-token-here`
    - Service will auto-redeploy
-5. **Custom domain:** Railway dashboard → Settings → Domains
-6. **Test health:** Visit `/health` to verify deployment
+6. **Custom domain:** Railway dashboard → Settings → Domains
+7. **Test health:** Visit `/health` to verify deployment
 
 **Cost:** $5/month for hobby plan  
 **Features:** Auto-deploy, custom domains, zero config
@@ -24,7 +28,14 @@ Deploy your screenshot gallery to a custom domain without managing servers!
 - **Build fails?** Check Deployments tab for logs
 - **Health check fails?** Visit `/health` to see detailed status
 - **Upload not working?** Verify `UPLOAD_TOKEN` is set in Variables
+- **Images disappear after redeploy?** Make sure Volume is mounted at `/app/source`
 - **Static files not loading?** Railway automatically handles static mounting
+
+### ⚠️ Railway Storage Important Notes:
+- **FREE TIER:** May not include persistent volumes
+- **HOBBY PLAN ($5/mo):** Includes persistent storage
+- **Without Volume:** Uploaded images are LOST on redeploy
+- **With Volume:** Images persist across deployments
 
 ---
 
