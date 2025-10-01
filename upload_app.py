@@ -58,9 +58,9 @@ def regenerate_image_list():
     """Run lister.py to regenerate image_widths_heights.json"""
     try:
         result = subprocess.run(
-            ["python3", "lister.py"], 
-            cwd=SOURCE_DIR, 
-            capture_output=True, 
+            ["/var/www/vibe-screenshots/venv/bin/python3", "lister.py"],
+            cwd=SOURCE_DIR,
+            capture_output=True,
             text=True,
             check=True
         )
@@ -79,10 +79,14 @@ async def upload_page():
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             * { box-sizing: border-box; }
-            body { 
+            body {
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 max-width: 800px; margin: 0 auto; padding: 20px;
                 background: #f5f5f5;
+                -webkit-text-size-adjust: 100%;
+            }
+            h1 {
+                text-align: center; margin-bottom: 10px;
             }
             .upload-area {
                 border: 3px dashed #ccc; border-radius: 10px;
@@ -99,41 +103,96 @@ async def upload_page():
                 font-size: 16px; margin: 10px;
             }
             .upload-btn:hover { background: #0056b3; }
-            .status { 
+            .paste-btn { background: #6c757d; }
+            .paste-btn:hover { background: #5a6268; }
+            .status {
                 margin: 10px 0; padding: 10px; border-radius: 4px;
                 display: none;
             }
+            .preview-container {
+                display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0;
+            }
+            .preview-item {
+                position: relative; border: 2px solid #ddd; border-radius: 8px;
+                padding: 5px; background: white; max-width: 200px;
+            }
+            .preview-item img {
+                width: 100%; height: auto; border-radius: 4px;
+            }
+            .preview-remove {
+                position: absolute; top: -8px; right: -8px;
+                background: #dc3545; color: white; border: none;
+                border-radius: 50%; width: 24px; height: 24px;
+                cursor: pointer; font-size: 14px; line-height: 1;
+            }
+            .preview-remove:hover { background: #c82333; }
             .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
             .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
             .token-input {
-                width: 100%; padding: 10px; margin: 10px 0;
+                width: 100%; padding: 12px; margin: 10px 0;
                 border: 1px solid #ddd; border-radius: 4px; font-size: 16px;
+            }
+            .paste-area {
+                width: 100%; min-height: 120px; padding: 15px;
+                border: 2px dashed #007bff; border-radius: 8px;
+                background: #f8f9fa; margin: 15px 0;
+                font-size: 16px; resize: vertical;
+                font-family: inherit;
+            }
+            .paste-area:focus {
+                outline: none; border-color: #0056b3;
+                background: white;
+            }
+            .paste-instruction {
+                text-align: center; color: #6c757d;
+                margin: 10px 0; font-size: 14px;
             }
             @media (max-width: 600px) {
                 body { padding: 10px; }
                 .upload-area { padding: 20px; }
+                .upload-btn {
+                    padding: 14px 20px; font-size: 16px;
+                    width: 100%; margin: 5px 0;
+                }
+                h1 { font-size: 24px; }
+                .preview-item { max-width: 150px; }
             }
         </style>
     </head>
     <body>
         <h1>📸 Screenshot Upload</h1>
-        
+
         <div>
-            <input type="password" id="token" class="token-input" 
+            <input type="password" id="token" class="token-input"
                    placeholder="Enter upload token" autocomplete="off">
         </div>
-        
+
+        <!-- Mobile-friendly paste area -->
+        <div class="paste-instruction">
+            📋 <strong>Paste images here</strong> (tap and hold to paste on mobile)
+        </div>
+        <textarea id="pasteArea" class="paste-area"
+                  placeholder="Tap here and paste your screenshot... (long press and select Paste on mobile)"></textarea>
+
+        <div style="text-align: center; margin: 15px 0; color: #6c757d;">
+            — OR —
+        </div>
+
         <div class="upload-area" id="uploadArea">
-            <h3>📤 Drop images here or click to select</h3>
+            <h3>📤 Drop or select files</h3>
             <p>Supports: JPG, PNG, HEIC, GIF, WebP</p>
-            <input type="file" id="fileInput" class="file-input" 
-                   multiple accept="image/*" capture="environment">
+            <input type="file" id="fileInput" class="file-input"
+                   multiple accept="image/*">
             <button class="upload-btn">Choose Files</button>
         </div>
-        
+
         <div id="status" class="status"></div>
-        
-        <div id="previews"></div>
+
+        <div id="previews" style="margin: 20px 0;"></div>
+
+        <button id="submitBtn" class="upload-btn" style="display: none; width: 100%; background: #28a745;">
+            Upload Selected Images
+        </button>
 
         <script>
             const uploadArea = document.getElementById('uploadArea');
@@ -141,6 +200,10 @@ async def upload_page():
             const tokenInput = document.getElementById('token');
             const status = document.getElementById('status');
             const previews = document.getElementById('previews');
+            const submitBtn = document.getElementById('submitBtn');
+            const pasteArea = document.getElementById('pasteArea');
+
+            let selectedFiles = [];
 
             // Load saved token
             tokenInput.value = localStorage.getItem('uploadToken') || '';
@@ -150,7 +213,9 @@ async def upload_page():
                 localStorage.setItem('uploadToken', tokenInput.value);
             });
 
-            uploadArea.addEventListener('click', () => fileInput.click());
+            uploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
 
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -164,32 +229,126 @@ async def upload_page():
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('drag-over');
-                handleFiles(e.dataTransfer.files);
+                addFiles(e.dataTransfer.files);
             });
 
             fileInput.addEventListener('change', (e) => {
-                handleFiles(e.target.files);
+                addFiles(e.target.files);
             });
 
-            function showStatus(message, type) {
-                status.textContent = message;
-                status.className = `status ${type}`;
-                status.style.display = 'block';
-                setTimeout(() => status.style.display = 'none', 5000);
+            // Paste area handler
+            pasteArea.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const items = e.clipboardData.items;
+                let foundImage = false;
+                for (let item of items) {
+                    if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        if (file) {
+                            addFiles([file]);
+                            foundImage = true;
+                        }
+                    }
+                }
+                if (foundImage) {
+                    showStatus('✅ Image pasted! Review and click Upload.', 'success');
+                    pasteArea.value = '';
+                } else {
+                    showStatus('No image found in clipboard', 'error');
+                }
+            });
+
+            // Clear placeholder text on focus
+            pasteArea.addEventListener('focus', () => {
+                pasteArea.placeholder = 'Paste now...';
+            });
+
+            pasteArea.addEventListener('blur', () => {
+                pasteArea.placeholder = 'Tap here and paste your screenshot... (long press and select Paste on mobile)';
+            });
+
+            // Global paste handler for convenience
+            document.addEventListener('paste', (e) => {
+                // Skip if pasting in the textarea (it has its own handler)
+                if (e.target === pasteArea) return;
+
+                const items = e.clipboardData.items;
+                let foundImage = false;
+                for (let item of items) {
+                    if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        if (file) {
+                            addFiles([file]);
+                            foundImage = true;
+                        }
+                    }
+                }
+                if (foundImage) {
+                    showStatus('✅ Image pasted! Review and click Upload.', 'success');
+                }
+            });
+
+            function addFiles(files) {
+                for (let file of files) {
+                    if (file.type.startsWith('image/')) {
+                        selectedFiles.push(file);
+                    }
+                }
+                updatePreviews();
             }
 
-            async function handleFiles(files) {
+            function updatePreviews() {
+                previews.innerHTML = '';
+                if (selectedFiles.length === 0) {
+                    submitBtn.style.display = 'none';
+                    return;
+                }
+
+                previews.className = 'preview-container';
+                selectedFiles.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const div = document.createElement('div');
+                        div.className = 'preview-item';
+                        div.innerHTML = `
+                            <img src="${e.target.result}" alt="${file.name}">
+                            <button class="preview-remove" data-index="${index}">×</button>
+                        `;
+                        previews.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                submitBtn.style.display = 'block';
+                fileInput.value = '';
+            }
+
+            previews.addEventListener('click', (e) => {
+                if (e.target.classList.contains('preview-remove')) {
+                    const index = parseInt(e.target.dataset.index);
+                    selectedFiles.splice(index, 1);
+                    updatePreviews();
+                }
+            });
+
+            submitBtn.addEventListener('click', async () => {
                 if (!tokenInput.value.trim()) {
                     showStatus('Please enter your upload token', 'error');
                     return;
                 }
 
-                const formData = new FormData();
-                for (let file of files) {
-                    formData.append('files', file);
+                if (selectedFiles.length === 0) {
+                    showStatus('No files selected', 'error');
+                    return;
                 }
 
+                const formData = new FormData();
+                selectedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
                 try {
+                    submitBtn.disabled = true;
                     showStatus('Uploading...', 'success');
                     const response = await fetch('/upload', {
                         method: 'POST',
@@ -200,16 +359,26 @@ async def upload_page():
                     });
 
                     const result = await response.json();
-                    
+
                     if (response.ok) {
                         showStatus(`✅ Uploaded ${result.uploaded_count} files successfully!`, 'success');
-                        fileInput.value = '';
+                        selectedFiles = [];
+                        updatePreviews();
                     } else {
                         showStatus(`❌ Error: ${result.detail}`, 'error');
                     }
                 } catch (error) {
                     showStatus(`❌ Upload failed: ${error.message}`, 'error');
+                } finally {
+                    submitBtn.disabled = false;
                 }
+            });
+
+            function showStatus(message, type) {
+                status.textContent = message;
+                status.className = `status ${type}`;
+                status.style.display = 'block';
+                setTimeout(() => status.style.display = 'none', 5000);
             }
         </script>
     </body>
@@ -292,4 +461,4 @@ if __name__ == "__main__":
     print(f"🔑 Upload token: {UPLOAD_TOKEN}")
     print("🌐 Access upload interface at: http://localhost:8001")
     
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8766)

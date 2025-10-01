@@ -1,0 +1,41 @@
+# Environment variables (contains upload token)
+.env
+
+# Python virtual environment
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Uploaded images
+source/*.png
+source/*.jpg
+source/*.jpeg
+source/*.gif
+source/*.webp
+source/*.heic
+source/*.bmp
+source/*.tiff
+
+# Generated image metadata
+source/image_widths_heights.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

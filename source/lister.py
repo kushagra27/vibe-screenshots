@@ -1,5 +1,11 @@
+#!/usr/bin/env python3
 import os
+import sys
 import json
+
+# Add parent directory's venv to path
+sys.path.insert(0, '/var/www/vibe-screenshots/venv/lib/python3.12/site-packages')
+
 try:
     from PIL import Image
     from pillow_heif import register_heif_opener
