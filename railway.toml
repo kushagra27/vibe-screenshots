@@ -2,11 +2,7 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "python upload_app.py"
+startCommand = "python railway_app.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-
-[env]
-PORT = "8000"
-UPLOAD_TOKEN = "${{RAILWAY_UPLOAD_TOKEN}}"

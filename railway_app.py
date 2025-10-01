@@ -34,7 +34,11 @@ app.add_middleware(
 
 # Security
 security = HTTPBearer()
-UPLOAD_TOKEN = os.getenv("UPLOAD_TOKEN", "demo-token-railway")
+UPLOAD_TOKEN = os.getenv("UPLOAD_TOKEN")
+if not UPLOAD_TOKEN:
+    print("⚠️  WARNING: UPLOAD_TOKEN environment variable not set!")
+    print("   Set it in Railway dashboard under Variables")
+    UPLOAD_TOKEN = "demo-token-railway-insecure"
 
 # Paths
 SOURCE_DIR = Path("source")
@@ -295,7 +299,17 @@ async def upload_files(
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "upload_dir": str(UPLOAD_DIR)}
+    try:
+        # Check if source directory exists
+        source_exists = SOURCE_DIR.exists()
+        return {
+            "status": "healthy", 
+            "upload_dir": str(UPLOAD_DIR),
+            "source_dir_exists": source_exists,
+            "upload_token_set": bool(UPLOAD_TOKEN and UPLOAD_TOKEN != "demo-token-railway-insecure")
+        }
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

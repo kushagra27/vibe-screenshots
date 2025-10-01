@@ -9,13 +9,22 @@ Deploy your screenshot gallery to a custom domain without managing servers!
 ### Steps:
 1. **Connect GitHub:** [railway.app](https://railway.app) → "Deploy from GitHub"
 2. **Select repo:** `your-username/vibe-screenshots`
-3. **Set environment variable:**
-   - `UPLOAD_TOKEN` = `your-secret-token-here`
-4. **Deploy:** Uses `railway.toml` automatically
+3. **Wait for first deploy** (will use demo token initially)
+4. **Set environment variable:**
+   - Go to Variables tab in Railway dashboard
+   - Add `UPLOAD_TOKEN` = `your-secret-token-here`
+   - Service will auto-redeploy
 5. **Custom domain:** Railway dashboard → Settings → Domains
+6. **Test health:** Visit `/health` to verify deployment
 
 **Cost:** $5/month for hobby plan  
 **Features:** Auto-deploy, custom domains, zero config
+
+### Railway Troubleshooting:
+- **Build fails?** Check Deployments tab for logs
+- **Health check fails?** Visit `/health` to see detailed status
+- **Upload not working?** Verify `UPLOAD_TOKEN` is set in Variables
+- **Static files not loading?** Railway automatically handles static mounting
 
 ---
 
