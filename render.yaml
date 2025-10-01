@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: vibe-screenshots
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python railway_app.py"
+    healthCheckPath: /health
+    envVars:
+      - key: UPLOAD_TOKEN
+        generateValue: true
+      - key: PORT
+        value: 10000
+    autoDeploy: false

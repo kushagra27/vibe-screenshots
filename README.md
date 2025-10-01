@@ -33,14 +33,30 @@ A beautiful screenshot gallery with web upload functionality. Display your scree
    - 📤 **Upload**: http://localhost:8001
    - 🔑 **Token**: `dev-token-123` (default)
 
-## Production Deployment
+## 🚀 Zero-VM Deployment
+
+Deploy to a custom domain **without managing servers!**
+
+**Quick Deploy Options:**
+- **Railway** (recommended): 5-min setup, $5/month → [Deploy Guide](DEPLOY.md#recommended-railway)
+- **Render** (free tier): Free option available → [Deploy Guide](DEPLOY.md#alternative-rendercom)
+- **Fly.io** (performance): Global edge, $2-5/month → [Deploy Guide](DEPLOY.md#advanced-flyio)
+
+**See [DEPLOY.md](DEPLOY.md) for complete step-by-step instructions**
+
+## Traditional VPS Deployment
 
 1. **Set secure token:**
    ```bash
    export UPLOAD_TOKEN="your-super-secret-token"
    ```
 
-2. **Run servers:**
+2. **Run unified server:**
+   ```bash
+   python railway_app.py
+   ```
+
+3. **Or run separate servers:**
    ```bash
    # Gallery server
    cd source && python -m http.server 8000
@@ -48,10 +64,6 @@ A beautiful screenshot gallery with web upload functionality. Display your scree
    # Upload server  
    python upload_app.py
    ```
-
-3. **Configure reverse proxy** (nginx/apache) to serve both:
-   - Gallery: `domain.com` → `localhost:8000`
-   - Upload: `domain.com/upload` → `localhost:8001`
 
 ## How It Works
 
