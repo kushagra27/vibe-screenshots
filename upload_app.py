@@ -350,7 +350,9 @@ async def upload_page():
                 try {
                     submitBtn.disabled = true;
                     showStatus('Uploading...', 'success');
-                    const response = await fetch('/upload', {
+                    // Use relative path that works with nginx proxy
+                    const uploadPath = window.location.pathname.replace('/upload', '/api/upload');
+                    const response = await fetch(uploadPath, {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${tokenInput.value}`
