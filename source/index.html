@@ -13,9 +13,18 @@ function shuffleArray(array) {
     return array;
 }
 
-fetch("image_widths_heights.json").then(f => {
-    if (f.status == 404) {
-        alert("unable to find image_widths_heights.json -- you should run lister.py to create it.");
+// Add cache-busting timestamp to prevent stale data
+// Use relative path that works from current location
+const jsonUrl = new URL("image_widths_heights.json", window.location.href).href;
+fetch(jsonUrl + "?v=" + Date.now(), {
+    cache: 'no-cache',
+    headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+    }
+}).then(f => {
+    if (!f.ok) {
+        throw new Error(`HTTP ${f.status}: ${f.statusText} (tried: ${jsonUrl})`);
     }
     return f.json()
 }).then(data => {
@@ -109,7 +118,8 @@ fetch("image_widths_heights.json").then(f => {
 
         // Create the image
         let img = document.createElement("img");
-        img.src = key_values[i][0];
+        // Use proper relative URL resolution
+        img.src = new URL(key_values[i][0], window.location.href).href;
         img.width = pairs[i][0];
         img.height = pairs[i][1];
         img.style.width = pairs[i][0];
@@ -125,6 +135,9 @@ fetch("image_widths_heights.json").then(f => {
             clearInterval(interval);
         }
     }, 100);
-})
+}).catch(error => {
+    console.error('Error loading gallery:', error);
+    alert("Error loading gallery: " + error.message + "\n\nPlease try:\n1. Hard refresh (Ctrl+Shift+R or Cmd+Shift+R)\n2. Clear browser cache\n3. Check image_widths_heights.json exists");
+});
     </script>
 </html>

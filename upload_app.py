@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from PIL import Image
 import pillow_heif
+from metadata_store import MetadataStore
 
 # Register HEIF opener for iOS photos
 pillow_heif.register_heif_opener()
@@ -37,6 +38,9 @@ UPLOAD_DIR = SOURCE_DIR  # Images go directly to source directory
 # Ensure directories exist
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+# Initialize metadata store
+metadata_store = MetadataStore(SOURCE_DIR)
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != UPLOAD_TOKEN:
         raise HTTPException(
@@ -54,9 +58,13 @@ def is_valid_image(file_content: bytes) -> bool:
     except Exception:
         return False
 
-def regenerate_image_list():
-    """Run lister.py to regenerate image_widths_heights.json"""
+def cleanup_metadata():
+    """Clean up orphaned metadata and regenerate image list"""
     try:
+        # Step 1: Clean orphaned entries from uploads_metadata.json
+        orphaned = metadata_store.cleanup_orphaned_metadata()
+
+        # Step 2: Regenerate image_widths_heights.json
         result = subprocess.run(
             ["/var/www/vibe-screenshots/venv/bin/python3", "lister.py"],
             cwd=SOURCE_DIR,
@@ -64,9 +72,16 @@ def regenerate_image_list():
             text=True,
             check=True
         )
-        return {"success": True, "output": result.stdout}
+
+        return {
+            "success": True,
+            "orphaned_removed": orphaned,
+            "output": result.stdout
+        }
     except subprocess.CalledProcessError as e:
         return {"success": False, "error": e.stderr}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.get("/", response_class=HTMLResponse)
 async def upload_page():
@@ -409,39 +424,49 @@ async def upload_files(
             # Read file content
             content = await file.read()
             
-            # Validate it's actually an image
+            # Validate it's actually an image and get dimensions
             try:
                 img = Image.open(io.BytesIO(content))
+                dimensions = img.size  # (width, height)
                 img.verify()  # Verify it's not corrupted
             except Exception:
                 errors.append(f"{file.filename}: Invalid or corrupted image")
                 continue
-            
+
             # Generate unique filename to avoid conflicts
             file_extension = Path(file.filename).suffix.lower()
             if not file_extension:
                 file_extension = '.jpg'
-            
+
             unique_filename = f"{uuid.uuid4()}{file_extension}"
             file_path = UPLOAD_DIR / unique_filename
-            
+
             # Save file
             with open(file_path, "wb") as f:
                 f.write(content)
-            
+
+            # Record metadata
+            metadata_store.record_upload(
+                filename=unique_filename,
+                original_filename=file.filename,
+                size_bytes=len(content),
+                dimensions=dimensions,
+                content_type=file.content_type
+            )
+
             uploaded_files.append(unique_filename)
             
         except Exception as e:
             errors.append(f"{file.filename}: {str(e)}")
     
-    # Regenerate the image list
-    regen_result = regenerate_image_list()
+    # Clean up metadata and regenerate the image list
+    cleanup_result = cleanup_metadata()
     
     response = {
         "uploaded_count": len(uploaded_files),
         "uploaded_files": uploaded_files,
         "errors": errors,
-        "regeneration": regen_result
+        "cleanup": cleanup_result
     }
     
     if errors and not uploaded_files:

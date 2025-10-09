@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from PIL import Image
 import pillow_heif
+from metadata_store import MetadataStore
 
 # Register HEIF opener for iOS photos
 pillow_heif.register_heif_opener()
@@ -47,6 +48,9 @@ UPLOAD_DIR = SOURCE_DIR
 # Ensure directories exist
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+# Initialize metadata store
+metadata_store = MetadataStore(SOURCE_DIR)
+
 # Mount static files for gallery
 app.mount("/static", StaticFiles(directory="source"), name="static")
 
@@ -59,19 +63,17 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         )
     return credentials
 
-def regenerate_image_list():
-    """Run lister.py to regenerate image_widths_heights.json"""
+def cleanup_metadata():
+    """Clean up orphaned metadata entries"""
     try:
-        result = subprocess.run(
-            ["python3", "lister.py"], 
-            cwd=SOURCE_DIR, 
-            capture_output=True, 
-            text=True,
-            check=True
-        )
-        return {"success": True, "output": result.stdout}
-    except subprocess.CalledProcessError as e:
-        return {"success": False, "error": e.stderr}
+        # Clean orphaned entries from uploads_metadata.json
+        orphaned = metadata_store.cleanup_orphaned_metadata()
+        return {
+            "success": True,
+            "orphaned_removed": orphaned
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.get("/", response_class=HTMLResponse)
 async def gallery():
@@ -442,36 +444,50 @@ async def upload_files(
             
             # Read file content
             content = await file.read()
-            
-            # Validate it's actually an image
+
+            # Validate it's actually an image and get dimensions
             try:
                 img = Image.open(io.BytesIO(content))
+                dimensions = img.size  # (width, height)
                 img.verify()
             except Exception:
                 errors.append(f"{file.filename}: Invalid or corrupted image")
                 continue
-            
+
             # Generate unique filename
             file_extension = Path(file.filename).suffix.lower()
             if not file_extension:
                 file_extension = '.jpg'
-            
+
             unique_filename = f"{uuid.uuid4()}{file_extension}"
             file_path = UPLOAD_DIR / unique_filename
-            
+
             # Save file
             with open(file_path, "wb") as f:
                 f.write(content)
-            
+
+            # Record metadata
+            metadata_store.record_upload(
+                filename=unique_filename,
+                original_filename=file.filename,
+                size_bytes=len(content),
+                dimensions=dimensions,
+                content_type=file.content_type
+            )
+
             uploaded_files.append(unique_filename)
             
         except Exception as e:
             errors.append(f"{file.filename}: {str(e)}")
-    
+
+    # Clean up orphaned metadata
+    cleanup_result = cleanup_metadata()
+
     response = {
         "uploaded_count": len(uploaded_files),
         "uploaded_files": uploaded_files,
         "errors": errors,
+        "cleanup": cleanup_result,
         "message": f"Uploaded {len(uploaded_files)} files successfully! Gallery will update automatically."
     }
     
